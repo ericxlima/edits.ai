@@ -1,0 +1,4 @@
+venv/
+.mypy_cache/
+*.mp3
+*.mp4
