@@ -1,4 +1,6 @@
 venv/
 .mypy_cache/
+temp/
 *.mp3
 *.mp4
+.env
