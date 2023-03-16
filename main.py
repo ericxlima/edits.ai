@@ -34,28 +34,30 @@ def download_music(music_artist: str, music_name: str) -> None:
 
 
 def generate(text):
-    with autocast(device):
+    with autocast('cpu'):
         image = pipe(text, guidance_scale=8.5)["sample"][0]
     image.save('generatedimage.png')
 
 
 if __name__ == '__main__':
-    load_dotenv()
-    artist = 'Lucy Rose'
-    music = 'Middle of the Bed'
-    api_key = os.getenv("vagalumeKey")
-    hugginface_key = os.getenv('hugginfaceKey')
+    # load_dotenv()
+    # artist = 'Lucy Rose'
+    # music = 'Middle of the Bed'
+    # api_key = os.getenv("vagalumeKey")
+    # hugginface_key = os.getenv('hugginfaceKey')
 
-    # download_music(artist, music)
-    # get_lyrics(artist, music, api_key)
+    # # download_music(artist, music)
+    # # get_lyrics(artist, music, api_key)
 
-    modelid = "CompVis/stable-diffusion-v1-4"
-    device = "cuda"
-    pipe = StableDiffusionPipeline.from_pretrained(
-        modelid,
-        revision="fp16",
-        torch_dtype=torch.float16,
-        use_auth_token=hugginface_key)
-    pipe.to(device)
+    # modelid = "CompVis/stable-diffusion-v1-4"
+    # device = torch.device('cpu')
+    # pipe = StableDiffusionPipeline.from_pretrained(
+    #     modelid,
+    #     revision="fp16",
+    #     torch_dtype=torch.float32,
+    #     use_auth_token=hugginface_key,
+    #     device=device)
 
-    generate('Dog and Cat')
+    # generate('Dog and Cat')
+    import torch
+    print(torch.cuda.is_available())
