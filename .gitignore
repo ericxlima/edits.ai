@@ -4,3 +4,4 @@ temp/
 *.mp3
 *.mp4
 .env
+*.jpg
