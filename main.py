@@ -7,6 +7,9 @@ from pytube import Search
 
 import replicate
 
+from moviepy.editor import AudioFileClip, ImageClip, TextClip, CompositeVideoClip, concatenate_videoclips
+from moviepy.config import change_settings
+
 
 def download_music(music_artist: str, music_name: str) -> None:
     try:
@@ -14,8 +17,7 @@ def download_music(music_artist: str, music_name: str) -> None:
         search_query = search_query.results[0]
         music = search_query.streams.filter(only_audio=True).first()
         downloaded_file = music.download(files_path)
-        base, _ = os.path.splitext(downloaded_file)
-        new_file = base + '.mp3'
+        new_file = f'{files_path}music.mp3'
         os.rename(downloaded_file, new_file)
         print(f">>> The music {music_name.upper()} by {music_artist.upper()} was downloaded.")
     except Exception as err:
@@ -70,21 +72,41 @@ def generate_images(lyrics:list[str]) -> None:
         print(f'>>> Error while generate the images.')
         print('>>> ', err)
         
+        
 def create_video():
-    pass
+    audio = AudioFileClip(f'{files_path}/music.mp3').subclip(start_second, start_second + duration)
+    
+    concatenate_array = []
+    
+    for idx in range(qtd_phrases):
+        duration_clip = duration/qtd_phrases
+        image = ImageClip(f'{files_path}/{idx}.jpg').set_duration(duration_clip)
+        text = TextClip(lyrics[idx], fontsize=40, color='white').set_duration(duration_clip)
+        compose = CompositeVideoClip([image, text.set_pos('center')], size=(768, 768))
+        concatenate_array.append(compose)
 
+    video = concatenate_videoclips(concatenate_array)
+    video.audio = audio
+    
+    video.preview()
+    # video.write_videofile(f'{files_path}/output.mp4', fps=24, codec='libx264', audio_codec='aac')
+    
+    
 
 if __name__ == '__main__':
     
     # User Settings
-    artist = "Compton's Most Wanted"
-    music = "Hood Took Me Under"
-    files_path = "temp/"
+    artist = "Coolio"
+    music = "Gangsta's Paradise"
+    files_path = "assets2/"
     first_phrase = 0
     qtd_phrases = 10
+    start_second = 26
+    duration = 30
     
     # Environment Settings
     load_dotenv()
+    change_settings({"IMAGEMAGICK_BINARY": os.getenv("magickPath")})
     vagalume_api_key = os.getenv("vagalumeKey")
     hugginface_api_key = os.getenv('hugginfaceKey')
     replicate_key = os.getenv('replicateKey')
@@ -93,6 +115,7 @@ if __name__ == '__main__':
     version = model.versions.get(os.getenv('modelIDVersion'))
 
     # download_music(artist, music)
-    # lyrics = get_lyrics(artist, music, vagalume_api_key, first_phrase, qtd_phrases)
+    lyrics = get_lyrics(artist, music, vagalume_api_key, first_phrase, qtd_phrases)
     # generate_images(lyrics)
     
+    create_video()
