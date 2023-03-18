@@ -7,7 +7,7 @@ from pytube import Search
 
 import replicate
 
-from moviepy.editor import AudioFileClip, ImageClip, TextClip, CompositeVideoClip, concatenate_videoclips
+from moviepy.editor import AudioFileClip, ImageClip, TextClip, CompositeVideoClip, concatenate_videoclips, clips_array
 from moviepy.config import change_settings
 
 
@@ -81,17 +81,23 @@ def create_video():
     for idx in range(qtd_phrases):
         duration_clip = duration/qtd_phrases
         image = ImageClip(f'{files_path}/{idx}.jpg').set_duration(duration_clip)
-        text = TextClip(lyrics[idx], font="Amiri-bold", fontsize=24,
+        text = TextClip(lyrics[idx], font="Amiri-bold", fontsize=26,
                         color='yellow').set_duration(duration_clip)
-        text_col = text.on_color(size=(text.w + 10, text.h + 10), color=(0, 0, 0),
-                                 pos=(6, 'center'), col_opacity=0.85)
-        compose = CompositeVideoClip([image, text_col.set_pos(('center', 40))])
+        
+        text_col = text.on_color(size=(image.w, text.h + 40), color=(0, 0, 0),
+                                 pos=(6, 'center'), col_opacity=1)
+        
+        image_col = image.on_color(size=(image.w, image.h + text.h + 40), pos=(0, 0), 
+                                   color=(0, 255, 0), col_opacity=0.85)
+        
+        compose = CompositeVideoClip([image_col.set_pos((0, 0)), 
+                                      text_col.set_pos(('center', image.h))])
         concatenate_array.append(compose)
 
     video = concatenate_videoclips(concatenate_array)
     video.audio = audio
     
-    video.preview()
+    # video.preview()
     video.write_videofile(f'{files_path}/output.mp4', fps=24, codec='libx264', audio_codec='aac')
     
     
@@ -117,8 +123,8 @@ if __name__ == '__main__':
     model = replicate_client.models.get(os.getenv('modelName'))
     version = model.versions.get(os.getenv('modelIDVersion'))
 
-    download_music(artist, music)
+    # download_music(artist, music)
     lyrics = get_lyrics(artist, music, vagalume_api_key, first_phrase, qtd_phrases)
-    generate_images(lyrics)
+    # generate_images(lyrics)
     
     create_video()
