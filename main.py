@@ -81,27 +81,30 @@ def create_video():
     for idx in range(qtd_phrases):
         duration_clip = duration/qtd_phrases
         image = ImageClip(f'{files_path}/{idx}.jpg').set_duration(duration_clip)
-        text = TextClip(lyrics[idx], fontsize=40, color='white').set_duration(duration_clip)
-        compose = CompositeVideoClip([image, text.set_pos('center')], size=(768, 768))
+        text = TextClip(lyrics[idx], font="Amiri-bold", fontsize=24,
+                        color='yellow').set_duration(duration_clip)
+        text_col = text.on_color(size=(text.w + 10, text.h + 10), color=(0, 0, 0),
+                                 pos=(6, 'center'), col_opacity=0.85)
+        compose = CompositeVideoClip([image, text_col.set_pos(('center', 40))])
         concatenate_array.append(compose)
 
     video = concatenate_videoclips(concatenate_array)
     video.audio = audio
     
     video.preview()
-    # video.write_videofile(f'{files_path}/output.mp4', fps=24, codec='libx264', audio_codec='aac')
+    video.write_videofile(f'{files_path}/output.mp4', fps=24, codec='libx264', audio_codec='aac')
     
     
 
 if __name__ == '__main__':
     
     # User Settings
-    artist = "Coolio"
-    music = "Gangsta's Paradise"
-    files_path = "assets2/"
+    artist = " Compton's Most Wanted"
+    music = "Hood Took Me Under"
+    files_path = "assets/"
     first_phrase = 0
     qtd_phrases = 10
-    start_second = 26
+    start_second = 13
     duration = 30
     
     # Environment Settings
@@ -114,8 +117,8 @@ if __name__ == '__main__':
     model = replicate_client.models.get(os.getenv('modelName'))
     version = model.versions.get(os.getenv('modelIDVersion'))
 
-    # download_music(artist, music)
+    download_music(artist, music)
     lyrics = get_lyrics(artist, music, vagalume_api_key, first_phrase, qtd_phrases)
-    # generate_images(lyrics)
+    generate_images(lyrics)
     
     create_video()
