@@ -41,6 +41,7 @@ def get_lyrics(music_artist: str, music_name: str, api_key: str,
             music = music.replace('\n\n', '\n')
             music = music.split('\n')[start_phrase: start_phrase + qtd_phrases]
             print(f'>>> Get the lyrics of the music {music_name.upper()} by {music_artist.upper()}.')
+            # music = [music[i] + '\n' + music[i+1] for i in range(0, len(music), 2)]
             return music
         else:
             print(f'>>> Error while get the lyrics of the music {music_name.upper()} by {music_artist.upper()}.')
@@ -78,17 +79,20 @@ def create_video():
     
     concatenate_array = []
     
-    for idx in range(qtd_phrases):
-        duration_clip = duration/qtd_phrases
-        image = ImageClip(f'{files_path}/{idx}.jpg').set_duration(duration_clip)
-        text = TextClip(lyrics[idx], font="Amiri-bold", fontsize=26,
+    for idx in range(len(lyrics)):
+        duration_clip = duration/len(lyrics)
+        try:
+            image = ImageClip(f'{files_path}/{idx}.jpg').set_duration(duration_clip)
+        except FileNotFoundError:
+            image = ImageClip(f'{files_path}/{idx}.png').set_duration(duration_clip)
+        text = TextClip(lyrics[idx], font="Amiri-bold", fontsize=28,
                         color='yellow').set_duration(duration_clip)
         
-        text_col = text.on_color(size=(image.w, text.h + 40), color=(0, 0, 0),
+        text_col = text.on_color(size=(text.w + 10, text.h + 40), color=(0, 0, 0),
                                  pos=(6, 'center'), col_opacity=1)
         
         image_col = image.on_color(size=(image.w, image.h + text.h + 40), pos=(0, 0), 
-                                   color=(0, 255, 0), col_opacity=0.85)
+                                   color=(0, 0, 0), col_opacity=0.85)
         
         compose = CompositeVideoClip([image_col.set_pos((0, 0)), 
                                       text_col.set_pos(('center', image.h))])
@@ -99,18 +103,17 @@ def create_video():
     
     # video.preview()
     video.write_videofile(f'{files_path}/output.mp4', fps=24, codec='libx264', audio_codec='aac')
-    
-    
+
 
 if __name__ == '__main__':
     
     # User Settings
-    artist = " Compton's Most Wanted"
-    music = "Hood Took Me Under"
-    files_path = "assets/"
-    first_phrase = 0
-    qtd_phrases = 10
-    start_second = 13
+    artist = "Wiz Khalifa"
+    music = "See You Again"
+    files_path = "assets3/"
+    first_phrase = 5
+    qtd_phrases = 12
+    start_second = 39
     duration = 30
     
     # Environment Settings
@@ -126,5 +129,6 @@ if __name__ == '__main__':
     # download_music(artist, music)
     lyrics = get_lyrics(artist, music, vagalume_api_key, first_phrase, qtd_phrases)
     # generate_images(lyrics)
-    
+    # for i in lyrics:
+    #     print(i)
     create_video()
