@@ -1,7 +1,7 @@
 import os
 import requests
 import time
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Iterable, Any
 
 import replicate
 import numpy as np
@@ -19,17 +19,17 @@ from utils import generate_rgb_colors
 class Movie:
 
     def __init__(self, music_name: str, music_artist: str,
-                 path: str = 'assets', first_verse: int = 0,
+                 path: str = 'assets/', first_verse: int = 0,
                  n_verses: int = 0, start_time: float = 0,
                  time_duration: float = 0, watermark: str = "",
                  use_background: bool = False, video_width: int = 720,
-                 video_height: int = 1280) -> None:
+                 video_height: int = 1280, use_lyrics: bool = True) -> None:
         """Create a movie with the lyrics of a song.
 
         Args:
             music_name (str): music of name, the same name that is in the Valume API.
             music_artist (str): name of artist of the music.
-            path (str, optional): Directory of all files. Defaults to 'assets'.
+            path (str, optional): Directory of all files. Defaults to 'assets/'.
             first_verse (int, optional): Index to the first verse to lyrics. 
                                          Defaults to 0.
             n_verses (int, optional): Number of Verses to lyrics. Defaults to 0.
@@ -41,6 +41,7 @@ class Movie:
                                              randomly generated. Defaults to False (Black).
             video_width (int, optional): Width of the video in px. Defaults to 720.
             video_height (int, optional): Height of the video in px. Defaults to 1280.
+            use_lyrics (bool, optional): If True, the lyrics will be used. Defaults to True.
         """
 
         self._music_name = music_name
@@ -54,10 +55,14 @@ class Movie:
         self._use_background = use_background
         self._video_width = video_width
         self._video_height = video_height
+        self._use_lyrics = use_lyrics
 
-        # self._lyrics = self.get_lyrics()
-        if self.use_background:
-            self.create_gif_background()
+        self.__vagalume_api_key: Optional[str] = None
+        self._lyrics: Optional[List[str]] = None
+
+        self.__version: Any = None
+
+        self.config()
 
     @property
     def music_name(self) -> str:
@@ -103,38 +108,138 @@ class Movie:
     def video_height(self) -> int:
         return self._video_height
 
+    @property
+    def use_lyrics(self) -> bool:
+        return self._use_lyrics
+
+    def config(self) -> None:
+        """
+        Load the .env file, create directory for files and other configs.
+        """
+        load_dotenv()
+
+        if not os.path.exists(self.path):
+            os.mkdir(self.path)
+
+        if self.use_background:
+            self.create_gif_background()
+
+        self.__vagalume_api_key = os.getenv('vagalumeKey')
+        self._lyrics = self.get_lyrics()
+
+        replicate_key = os.getenv('replicateKey')
+        replicate_client = replicate.Client(api_token=replicate_key)
+        model = replicate_client.models.get(os.getenv('modelName'))
+        self.__version = model.versions.get(os.getenv('modelIDVersion'))
+
     def create_gif_background(self) -> None:
         """Create a gif file with a transition of random colors, and
         save in the path directory.
         """
+        try:
 
-        if not self.n_verses or not self.time_duration:
-            print('>>> Duration and Number of Verser are needed')
-            return
+            if not self.n_verses or not self.time_duration:
+                print('>>> Duration and Number of Verser are needed')
+                return
 
-        duration = self.time_duration / self.n_verses
-        colors = [generate_rgb_colors() for _ in range(self.n_verses)]
-        n_frames = int(duration * 30)
-        color_step = n_frames // (self.n_verses - 1)
+            duration = self.time_duration / self.n_verses
+            colors = [generate_rgb_colors() for _ in range(self.n_verses)]
+            n_frames = int(duration * 30)
+            color_step = n_frames // (self.n_verses - 1)
 
-        color_index = 0
-        frames = []
-        for i in range(n_frames):
-            if i % color_step == 0 and color_index < self.n_verses - 1:
-                start_color = colors[color_index]
-                end_color = colors[color_index + 1]
-                color_index += 1
+            color_index = 0
+            frames = []
+            for i in range(n_frames):
+                if i % color_step == 0 and color_index < self.n_verses - 1:
+                    start_color = colors[color_index]
+                    end_color = colors[color_index + 1]
+                    color_index += 1
 
-            color = np.full((self.video_height, self.video_width, 3),
-                            start_color, dtype=np.uint8)
-            for j in range(3):
-                color[:, :, j] += (end_color[j] - start_color[j]) * \
-                    (i % color_step) // color_step
-            frames.append(Image.fromarray(color))
+                color = np.full((self.video_height, self.video_width, 3),
+                                start_color, dtype=np.uint8)
+                for j in range(3):
+                    color[:, :, j] += (end_color[j] - start_color[j]) * \
+                        (i % color_step) // color_step
+                frames.append(Image.fromarray(color))
 
-        frames[0].save(f'{self.path}transicao.gif', format='GIF',
-                       append_images=frames[1:], save_all=True,
-                       duration=int(1000 / 30), loop=0)
+            frames[0].save(f'{self.path}transicao.gif', format='GIF',
+                           append_images=frames[1:], save_all=True,
+                           duration=int(1000 / 30), loop=0)
+        except Exception as err:
+            print(f'>>>An error occurred while generating the gif:\n>>> {err}')
+
+    def download_music(self) -> None:
+        try:
+            search_query = Search(f'{self.music_artist} {self.music_name}')
+            search_query = search_query.results[0]
+            music = search_query.streams.filter(only_audio=True).first()
+            downloaded_file = music.download(self.path)
+            new_file = f'{self.path}music.mp3'
+            os.rename(downloaded_file, new_file)
+            print(f'>>> The music "{self.music_name}" by '
+                  f'"{self.music_artist}" was downloaded.')
+        except Exception as err:
+            print(f'>>> Error while download the music "{self.music_name}" '
+                  f'by "{self.music_artist}".\n>>> {err}')
+
+    def get_lyrics(self) -> Optional[List[str]]:
+        try:
+            url = 'https://api.vagalume.com.br/search.php?art={0}&mus={1}'\
+                  '&apikey={2}'.format(self.music_artist, self.music_name,
+                                       self.__vagalume_api_key)
+            response = requests.get(url)
+
+            if response.status_code == 200:
+                json_data = response.json()
+                if json_data['type'] == 'notfound':
+                    print(f'>>> Error while get the lyrics of the music '
+                          f'"{self.music_name}" by "{self.music_artist}".')
+                    return []
+                music = json_data['mus'][0]['text']
+                music = music.replace('\n\n', '\n')
+                music = music.split('\n')
+                music = music[self.first_verse: self.first_verse + self.n_verses]
+                assert isinstance(music, list) and \
+                    all(isinstance(item, str) for item in music), \
+                    "Unexpected return type from get_lyrics()"
+                print(f'>>> Get the lyrics of the music "{self.music_name}"'
+                      f'by "{self.music_artist}".')
+                return music
+            else:
+                print(f'>>> Error while get the lyrics of the music'
+                      f'"{self.music_name}" by "{self.music_artist}".')
+                return []
+        except Exception as err:
+            print(f'>>> Error while get the lyrics of the music '
+                  f'"{self.music_name}" by "{self.music_artist}".')
+            print('>>> ', err)
+            return []
+
+    def generate_images(self) -> None:
+        try:
+            assert isinstance(self._lyrics, list) and \
+                all(isinstance(item, str) for item in self._lyrics), \
+                "Unexpected return type from generate_images()"
+            for idx, phrase in enumerate(self._lyrics):
+                inputs = {
+                    'prompt': phrase,
+                    'image_dimensions': "768x768",
+                    'num_outputs': 1,
+                    'num_inference_steps': 50,
+                    'guidance_scale': 7.5,
+                    'scheduler': "PNDM",
+                    'negative_prompt': 'text,phrases,words,Graffiti',
+                }
+                output = self.__version.predict(**inputs)
+                img_data = requests.get(output[0]).content
+                with open(f'{self.path}{idx}.jpg', 'wb') as handler:
+                    handler.write(img_data)
+                print(f'>>> The image {idx}.jpg was generated.')
+                time.sleep(2)
+            print('>>> All images was generated.')
+        except Exception as err:
+            print('>>> Error while generate the images.')
+            print('>>> ', err)
 
 
 def download_music(music_artist: str, music_name: str) -> None:
@@ -145,11 +250,11 @@ def download_music(music_artist: str, music_name: str) -> None:
         downloaded_file = music.download(files_path)
         new_file = f'{files_path}music.mp3'
         os.rename(downloaded_file, new_file)
-        print(f">>> The music {music_name.upper()} by '\
-            f'{music_artist.upper()} was downloaded.")
+        print(f">>> The music {music_name} by '\
+            f'{music_artist} was downloaded.")
     except Exception as err:
-        print(f'">>> Error while download the music {music_name.upper()} '
-              f'by {music_artist.upper()}.')
+        print(f'">>> Error while download the music {music_name} '
+              f'by {music_artist}.')
         print(">>> ", err)
 
 
@@ -165,7 +270,7 @@ def get_lyrics(music_artist: str, music_name: str,
             json_data = response.json()
             if json_data['type'] == 'notfound':
                 print(f'>>> Error while get the lyrics of the music '
-                      f'{music_name.upper()} by {music_artist.upper()}.')
+                      f'{music_name} by {music_artist}.')
                 return []
             music = json_data['mus'][0]['text']
             music = music.replace('\n\n', '\n')
@@ -173,16 +278,16 @@ def get_lyrics(music_artist: str, music_name: str,
             assert isinstance(music, list) and \
                 all(isinstance(item, str) for item in music), \
                 "Unexpected return type from get_lyrics()"
-            print(f'>>> Get the lyrics of the music {music_name.upper()}'
-                  f'by {music_artist.upper()}.')
+            print(f'>>> Get the lyrics of the music {music_name}'
+                  f'by {music_artist}.')
             return music
         else:
             print(f'>>> Error while get the lyrics of the music'
-                  f'{music_name.upper()} by {music_artist.upper()}.')
+                  f'{music_name} by {music_artist}.')
             return []
     except Exception as err:
         print(f'>>> Error while get the lyrics of the music '
-              f'{music_name.upper()} by {music_artist.upper()}.')
+              f'{music_name} by {music_artist}.')
         print('>>> ', err)
         return []
 
@@ -280,3 +385,5 @@ if __name__ == '__main__':
     # for i in lyrics:
     #     print(i)
     # create_video()
+
+    pass
