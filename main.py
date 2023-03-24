@@ -10,6 +10,33 @@ import replicate
 from moviepy.editor import AudioFileClip, ImageClip, TextClip, CompositeVideoClip, concatenate_videoclips, clips_array
 from moviepy.config import change_settings
 
+from PIL import Image, ImageSequence
+import numpy as np
+
+def create_gif_baclground():
+    width, height = 720, 1280
+    duration = 3
+    start_color = (0, 255, 0)
+    end_color = (255, 0, 0)
+
+    n_frames = int(duration * 30)
+    colors = []
+    for i in range(n_frames):
+        color = []
+        for j in range(3):
+            comp = int(start_color[j] + (end_color[j] - start_color[j]) * i / (n_frames - 1))
+            color.append(comp)
+        colors.append(tuple(color))
+
+    frames = []
+    for color in colors:
+        new_img = Image.fromarray(np.uint8(color * np.ones((height, width, 3))))
+        frames.append(new_img)
+        
+    frames[0].save(f'{files_path}transicao.gif', format='GIF', 
+                   append_images=frames[1:], save_all=True, 
+                   duration=int(1000/30), loop=0)
+
 
 def download_music(music_artist: str, music_name: str) -> None:
     try:
@@ -85,7 +112,10 @@ def create_video():
             image = ImageClip(f'{files_path}/{idx}.jpg').set_duration(duration_clip)
         except FileNotFoundError:
             image = ImageClip(f'{files_path}/{idx}.png').set_duration(duration_clip)
-        text = TextClip(lyrics[idx], font="Amiri-bold", fontsize=28,
+        if use_watermark:
+            watermark_text = TextClip(watermark, font="Amiri-bold", fontsize=22, 
+                                    color='white', ) # add transparent
+        text = TextClip(lyrics[idx], font="Amiri-bold", fontsize=35,
                         color='yellow').set_duration(duration_clip)
         
         text_col = text.on_color(size=(text.w + 10, text.h + 40), color=(0, 0, 0),
@@ -100,21 +130,23 @@ def create_video():
 
     video = concatenate_videoclips(concatenate_array)
     video.audio = audio
-    
+     
     # video.preview()
-    video.write_videofile(f'{files_path}/output.mp4', fps=24, codec='libx264', audio_codec='aac')
+    video.write_videofile(f'{files_path}output.mp4', fps=24, codec='mpeg4', threads=1)
 
 
 if __name__ == '__main__':
     
     # User Settings
-    artist = "Wiz Khalifa"
-    music = "See You Again"
-    files_path = "assets3/"
-    first_phrase = 5
-    qtd_phrases = 12
-    start_second = 39
-    duration = 30
+    watermark = "@riveclips"
+    artist = "Ice Cube"
+    music = "It Was A Good Day"
+    files_path = "assets/"
+    first_phrase = 0
+    qtd_phrases = 8
+    start_second = 33
+    duration = 25
+    use_watermark = False
     
     # Environment Settings
     load_dotenv()
@@ -126,9 +158,10 @@ if __name__ == '__main__':
     model = replicate_client.models.get(os.getenv('modelName'))
     version = model.versions.get(os.getenv('modelIDVersion'))
 
+    create_gif_baclground()
     # download_music(artist, music)
     lyrics = get_lyrics(artist, music, vagalume_api_key, first_phrase, qtd_phrases)
     # generate_images(lyrics)
     # for i in lyrics:
     #     print(i)
-    create_video()
+    # create_video()

@@ -6,3 +6,5 @@ temp/
 .env
 *.jpg
 *.png
+*.wav
+*.gif
