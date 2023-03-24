@@ -13,32 +13,128 @@ from moviepy.config import change_settings
 from moviepy.editor import AudioFileClip, ImageClip, TextClip, \
     CompositeVideoClip, concatenate_videoclips
 
+from utils import generate_rgb_colors
 
-def create_gif_background(colors: List[Tuple[int, int, int]]) -> None:
-    width, height = 720, 1280
-    duration = 3
 
-    n_frames = int(duration * 30)
-    n_colors = len(colors)
-    color_step = n_frames // (n_colors - 1)
+class Movie:
 
-    color_index = 0
-    frames = []
-    for i in range(n_frames):
-        if i % color_step == 0 and color_index < n_colors - 1:
-            start_color = colors[color_index]
-            end_color = colors[color_index + 1]
-            color_index += 1
+    def __init__(self, music_name: str, music_artist: str,
+                 path: str = 'assets', first_verse: int = 0,
+                 n_verses: int = 0, start_time: float = 0,
+                 time_duration: float = 0, watermark: str = "",
+                 use_background: bool = False, video_width: int = 720,
+                 video_height: int = 1280) -> None:
+        """Create a movie with the lyrics of a song.
 
-        color = np.full((height, width, 3), start_color, dtype=np.uint8)
-        for j in range(3):
-            color[:, :, j] += (end_color[j] - start_color[j]) * \
-                (i % color_step) // color_step
-        frames.append(Image.fromarray(color))
+        Args:
+            music_name (str): music of name, the same name that is in the Valume API.
+            music_artist (str): name of artist of the music.
+            path (str, optional): Directory of all files. Defaults to 'assets'.
+            first_verse (int, optional): Index to the first verse to lyrics. 
+                                         Defaults to 0.
+            n_verses (int, optional): Number of Verses to lyrics. Defaults to 0.
+            start_time (float, optional): Start of lyrics, in seconds. Defaults to 0.
+            time_duration (float, optional): Duration of lyrics video. Defaults to 0.
+            watermark (str, optional): Your personal watermark, if don't pass, 
+                                       any watermark was passed. Defaults to "".
+            use_background (bool, optional): If True, the background of the video is
+                                             randomly generated. Defaults to False (Black).
+            video_width (int, optional): Width of the video in px. Defaults to 720.
+            video_height (int, optional): Height of the video in px. Defaults to 1280.
+        """
 
-    frames[0].save(f'{files_path}transicao.gif', format='GIF',
-                   append_images=frames[1:], save_all=True,
-                   duration=int(1000 / 30), loop=0)
+        self._music_name = music_name
+        self._music_artist = music_artist
+        self._path = path
+        self._first_verse = first_verse
+        self._n_verses = n_verses
+        self._start_time = start_time
+        self._time_duration = time_duration
+        self._watermark = watermark
+        self._use_background = use_background
+        self._video_width = video_width
+        self._video_height = video_height
+
+        # self._lyrics = self.get_lyrics()
+        if self.use_background:
+            self.create_gif_background()
+
+    @property
+    def music_name(self) -> str:
+        return self._music_name
+
+    @property
+    def music_artist(self) -> str:
+        return self._music_artist
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @property
+    def first_verse(self) -> int:
+        return self._first_verse
+
+    @property
+    def n_verses(self) -> int:
+        return self._n_verses
+
+    @property
+    def start_time(self) -> float:
+        return self._start_time
+
+    @property
+    def time_duration(self) -> float:
+        return self._time_duration
+
+    @property
+    def watermark(self) -> str:
+        return self._watermark
+
+    @property
+    def use_background(self) -> bool:
+        return self._use_background
+
+    @property
+    def video_width(self) -> int:
+        return self._video_width
+
+    @property
+    def video_height(self) -> int:
+        return self._video_height
+
+    def create_gif_background(self) -> None:
+        """Create a gif file with a transition of random colors, and
+        save in the path directory.
+        """
+
+        if not self.n_verses or not self.time_duration:
+            print('>>> Duration and Number of Verser are needed')
+            return
+
+        duration = self.time_duration / self.n_verses
+        colors = [generate_rgb_colors() for _ in range(self.n_verses)]
+        n_frames = int(duration * 30)
+        color_step = n_frames // (self.n_verses - 1)
+
+        color_index = 0
+        frames = []
+        for i in range(n_frames):
+            if i % color_step == 0 and color_index < self.n_verses - 1:
+                start_color = colors[color_index]
+                end_color = colors[color_index + 1]
+                color_index += 1
+
+            color = np.full((self.video_height, self.video_width, 3),
+                            start_color, dtype=np.uint8)
+            for j in range(3):
+                color[:, :, j] += (end_color[j] - start_color[j]) * \
+                    (i % color_step) // color_step
+            frames.append(Image.fromarray(color))
+
+        frames[0].save(f'{self.path}transicao.gif', format='GIF',
+                       append_images=frames[1:], save_all=True,
+                       duration=int(1000 / 30), loop=0)
 
 
 def download_music(music_artist: str, music_name: str) -> None:
@@ -176,7 +272,7 @@ if __name__ == '__main__':
     model = replicate_client.models.get(os.getenv('modelName'))
     version = model.versions.get(os.getenv('modelIDVersion'))
 
-    create_gif_background([(255, 0, 0), (0, 255, 0), (0, 0, 255)])
+    # create_gif_background([(255, 0, 0), (0, 255, 0), (0, 0, 255)])
     # download_music(artist, music)
     # lyrics = get_lyrics(artist, music, vagalume_api_key,
     #                     first_phrase, qtd_phrases)
