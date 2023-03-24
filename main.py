@@ -1,20 +1,17 @@
 import os
 import requests
 import time
-
-from dotenv import load_dotenv
-from pytube import Search
+from typing import List, Tuple, Optional
 
 import replicate
+import numpy as np
+from dotenv import load_dotenv
+from pytube import Search
+from PIL import Image
 
+from moviepy.config import change_settings
 from moviepy.editor import AudioFileClip, ImageClip, TextClip, \
     CompositeVideoClip, concatenate_videoclips
-from moviepy.config import change_settings
-
-from PIL import Image
-import numpy as np
-
-from typing import List, Tuple, Optional
 
 
 def create_gif_background(colors: List[Tuple[int, int, int]]) -> None:

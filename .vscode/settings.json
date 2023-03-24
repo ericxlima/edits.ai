@@ -1,9 +1,54 @@
 {
-    "python.analysis.typeCheckingMode": "off",
-    "python.linting.enabled": true,
-    "python.linting.mypyEnabled": true,
-    "python.linting.flake8Enabled": true,
-    "python.formatting.provider": "autopep8",
+    "window.zoomLevel": 0,
     "python.languageServer": "Pylance",
-    
-}
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [],
+    "python.linting.flake8Enabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.pylintArgs": [
+      "--errors-only"
+    ],
+    "python.formatting.autopep8Args": ["--indent-size=4"],
+    "python.defaultInterpreterPath": "venv/bin/python",
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.python",
+      "editor.tabSize": 4,
+      "editor.insertSpaces": true,
+      "editor.formatOnSave": true,
+      "editor.formatOnType": true,
+      "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+      }
+    },
+    "[javascript]": {
+      "editor.maxTokenizationLineLength": 2500,
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[html]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "vscode.html-language-features",
+      "editor.quickSuggestions": {
+        "other": true,
+        "comments": true,
+        "strings": true
+      }
+    },
+    "workbench.colorTheme": "OM Theme (Night Owl Italic)",
+    "workbench.iconTheme": "material-icon-theme",
+    "flake8.interpreter": [
+      "venv/bin/python"
+    ],
+    "autopep8.interpreter": [
+      "venv/bin/python"
+    ],
+    "mypy.runUsingActiveInterpreter": true,
+    "python.interpreter.infoVisibility": "always",
+    "mypy.configFile": "mypy.ini",
+    "python.linting.mypyCategorySeverity.error": "Warning",
+    "flake8.logLevel": "warn",
+    "flake8.path": [
+      ".flake8"
+    ]
+  }
