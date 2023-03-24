@@ -8,3 +8,6 @@ temp/
 *.png
 *.wav
 *.gif
+*.txt
+!requirements.txt
+*__pycache__*
