@@ -1,5 +1,16 @@
 # RiveSong
 
+## So
+
+[x] - Get Lyrics automatically
+[x] - Translate the Lyrics automatically
+[x] - Download Music automatically
+[x] - Generate Images automatically
+[x] - Edit the video automatically
+[x] - Background Colors automatically
+
+## 4 Devs
+
 - Before run
 ```py
 # add 

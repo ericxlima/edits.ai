@@ -1,6 +1,7 @@
 import os
 import requests
 import time
+from pprint import pprint
 from typing import List, Optional, Any
 
 import replicate
@@ -22,12 +23,11 @@ from ibm_watson import ApiException
 class Movie:
 
     def __init__(self, music_name: str, music_artist: str,
-                 path: str = 'assets/', first_verse: int = 0,
+                 path: str = 'assets/', first_verse: float = 0,
                  n_verses: int = 0, start_time: float = 0,
                  time_duration: float = 0, watermark: str = "",
                  use_background: bool = False, video_width: int = 720,
-                 video_height: int = 1280, use_lyrics: bool = True,
-                 language: str = 'EN') -> None:
+                 video_height: int = 1280, use_lyrics: bool = True) -> None:
         """Create a movie with the lyrics of a song.
 
         Args:
@@ -46,7 +46,6 @@ class Movie:
             video_width (int, optional): Width of the video in px. Defaults to 720.
             video_height (int, optional): Height of the video in px. Defaults to 1280.
             use_lyrics (bool, optional): If True, the lyrics will be used. Defaults to True.
-            language (str, optional): Language of lyrics, ['EN', 'PT']. Defaults to 'EN'.
         """
 
         self._music_name = music_name
@@ -61,7 +60,6 @@ class Movie:
         self._video_width = video_width
         self._video_height = video_height
         self._use_lyrics = use_lyrics
-        self._language = language
 
         self.__vagalume_api_key: Optional[str] = None
         self._lyrics: Optional[List[str]] = None
@@ -84,7 +82,7 @@ class Movie:
         return self._path
 
     @property
-    def first_verse(self) -> int:
+    def first_verse(self) -> float:
         return self._first_verse
 
     @property
@@ -120,10 +118,6 @@ class Movie:
         return self._use_lyrics
 
     @property
-    def language(self) -> str:
-        return self._language
-
-    @property
     def lyrics(self) -> Optional[List[str]]:
         return self._lyrics
 
@@ -152,21 +146,15 @@ class Movie:
             self.download_music()
 
         self.__vagalume_api_key = os.getenv('vagalumeKey')
-        if os.path.exists(f"{self.path}lyrics.txt"):
-            with open(f"{self.path}lyrics.txt", 'r') as file:
-                self._lyrics = file.read().splitlines()
-        else:
+        if not os.path.exists(f"{self.path}lyrics.txt"):
             self._lyrics = self.get_lyrics()
+        else:
+            with open(f"{self.path}lyrics.txt", 'r') as f:
+                self._lyrics = f.read().splitlines()
+                self._lyrics = self._lyrics[int(self.first_verse):
+                                            int(self.first_verse) + self.n_verses]
 
-        if self.language == 'EN':
-            pass
-        elif self.language == 'PT':
-            assert isinstance(self.lyrics, list) and \
-                all(isinstance(item, str) for item in self.lyrics), \
-                "Unexpected return type from config()"
-            self.translated_lyrics = [
-                self.translate(verse) for verse in self.lyrics
-            ]
+        self.translate()
 
         replicate_key = os.getenv('replicateKey')
         replicate_client = replicate.Client(api_token=replicate_key)
@@ -209,8 +197,7 @@ class Movie:
                            duration=self.time_duration / self.n_verses, loop=0)
             print('>>> The gif background was created.')
         except Exception as err:
-            print('>>> An error occurred while generating the gif: '
-                  f'\n>>> {err}')
+            print('>>> An error occurred while generating the gif:\n>>>', err)
 
     def download_music(self) -> None:
         """
@@ -250,15 +237,17 @@ class Movie:
                 music = json_data['mus'][0]['text']
                 music = music.replace('\n\n', '\n')
                 music = music.split('\n')
-                music = music[self.first_verse: self.first_verse + self.n_verses]
+                music = list(filter(bool, music))
                 assert isinstance(music, list) and \
                     all(isinstance(item, str) for item in music), \
                     "Unexpected return type from get_lyrics()"
-                print(f'>>> Get the lyrics of the music "{self.music_name}"'
-                      f'by "{self.music_artist}".')
                 with open(f'{self.path}lyrics.txt', 'w') as file:
                     for string in music:
                         file.write(string + '\n')
+                music = music[int(self.first_verse): int(
+                    self.first_verse) + self.n_verses]
+                print(f'>>> Get the lyrics of the music "{self.music_name}"'
+                      f'by "{self.music_artist}".')
                 return music
             else:
                 print(f'>>> Error while get the lyrics of the music'
@@ -266,8 +255,7 @@ class Movie:
                 return []
         except Exception as err:
             print(f'>>> Error while get the lyrics of the music '
-                  f'"{self.music_name}" by "{self.music_artist}".')
-            print('>>> ', err)
+                  f'"{self.music_name}" by "{self.music_artist}".\n >>>', err)
             return []
 
     def generate_images(self) -> None:
@@ -275,12 +263,13 @@ class Movie:
         Generate images with the each verse of lyrics of the music.
         """
         try:
-            assert isinstance(self._lyrics, list) and \
-                all(isinstance(item, str) for item in self._lyrics), \
+            lyrics = self.translated_lyrics if self.translated_lyrics else self.lyrics
+            assert isinstance(lyrics, list) and \
+                all(isinstance(item, str) for item in lyrics), \
                 "Unexpected return type from generate_images()"
-            for idx, phrase in enumerate(self._lyrics):
+            for idx, verse in enumerate(lyrics):
                 inputs = {
-                    'prompt': phrase,
+                    'prompt': verse,
                     'image_dimensions': "768x768",
                     'num_outputs': 1,
                     'num_inference_steps': 50,
@@ -296,8 +285,7 @@ class Movie:
                 time.sleep(2)
             print('>>> All images was generated.')
         except Exception as err:
-            print('>>> Error while generate the images.')
-            print('>>> ', err)
+            print('>>> Error while generate the images.\n>>>', err)
 
     def create_video(self, ) -> None:
         """
@@ -326,7 +314,7 @@ class Movie:
                 "Unexpected return type from create_video()"
 
             formated_text = break_lines(self.lyrics[idx],
-                                        len(self.lyrics[idx]) // 2)
+                                        2 * len(self.lyrics[idx]) // 3)
             text = TextClip(formated_text, font="Amiri-bold", fontsize=40,
                             color='yellow').set_duration(duration_clip)
 
@@ -349,41 +337,54 @@ class Movie:
         video.write_videofile(f'{self.path}output.mp4', fps=24,
                               codec='mpeg4', threads=1)
 
-    def translate(self, message: str) -> Any:
+    def translate(self) -> None:
         try:
             autenticator = IAMAuthenticator(
                 os.environ['IAMAuthenticatorApiKey'])
-            version = '2023-01-13'  # last update
+            version = '2023-01-13'
             url_api = os.environ['WatsonURLApiKey']
 
-            language_translator = LanguageTranslatorV3(
+            language_translator_model = LanguageTranslatorV3(
                 version=f'{version}',
                 authenticator=autenticator)
-            language_translator.set_service_url(url_api)
+            language_translator_model.set_service_url(url_api)
 
-            translation = language_translator.translate(
-                text=message,
-                model_id='en-pt').get_result()
-            translation = translation["translations"][0]["translation"]
-            return translation
+            assert isinstance(self.lyrics, list) and \
+                all(isinstance(item, str) for item in self.lyrics), \
+                "Unexpected return type from translate()"
+
+            original_language = language_translator_model.identify(
+                self.lyrics[0]).get_result()
+            original_language = original_language["languages"][0]["language"]
+
+            if original_language != 'en':
+                self.translated_lyrics = []
+                for verse in self.lyrics:
+                    translation = language_translator_model.translate(
+                        text=verse,
+                        model_id=f'{original_language}-en').get_result()
+                    self.translated_lyrics.append(
+                        translation["translations"][0]["translation"])
+                with open(f'{self.path}translated_lyrics.txt', 'w') as file:
+                    for verse in self.translated_lyrics:
+                        file.write(verse + '\n')
 
         except ApiException as err:
-            print("Method failed with status code "
+            print(">>> Translate method failed with status code "
                   + str(err.code) + ": " + err.message)
 
 
 if __name__ == '__main__':
 
-    movie = Movie(music_name="It Was A Good Day",
-                  music_artist="Ice Cube",
-                  path="assets/",
-                  first_verse=0,
-                  n_verses=8,
-                  start_time=33,
-                  time_duration=25,
-                  use_background=True,
-                  )
+    movie = Movie(music_name="Bandolero (part. Md Chefe)",
+                  music_artist="Romaní",
+                  path="assets2/",
+                  first_verse=33.5,
+                  n_verses=16,
+                  start_time=68,
+                  time_duration=32,
+                  use_background=True)
+    # pprint(movie.lyrics)
+    # pprint(movie.translated_lyrics)
     # movie.generate_images()
-    # movie.create_video()
-
-    print(movie.translate("It was a good day"))
+    movie.create_video()
