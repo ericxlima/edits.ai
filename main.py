@@ -12,7 +12,11 @@ from PIL import Image
 from moviepy.editor import AudioFileClip, ImageClip, TextClip, \
     CompositeVideoClip, concatenate_videoclips
 
-from utils import generate_rgb_colors
+from utils import generate_rgb_colors, break_lines
+
+from ibm_watson import LanguageTranslatorV3
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from ibm_watson import ApiException
 
 
 class Movie:
@@ -22,7 +26,8 @@ class Movie:
                  n_verses: int = 0, start_time: float = 0,
                  time_duration: float = 0, watermark: str = "",
                  use_background: bool = False, video_width: int = 720,
-                 video_height: int = 1280, use_lyrics: bool = True) -> None:
+                 video_height: int = 1280, use_lyrics: bool = True,
+                 language: str = 'EN') -> None:
         """Create a movie with the lyrics of a song.
 
         Args:
@@ -41,6 +46,7 @@ class Movie:
             video_width (int, optional): Width of the video in px. Defaults to 720.
             video_height (int, optional): Height of the video in px. Defaults to 1280.
             use_lyrics (bool, optional): If True, the lyrics will be used. Defaults to True.
+            language (str, optional): Language of lyrics, ['EN', 'PT']. Defaults to 'EN'.
         """
 
         self._music_name = music_name
@@ -55,9 +61,12 @@ class Movie:
         self._video_width = video_width
         self._video_height = video_height
         self._use_lyrics = use_lyrics
+        self._language = language
 
         self.__vagalume_api_key: Optional[str] = None
         self._lyrics: Optional[List[str]] = None
+        self._translated_lyrics: Optional[List[str]] = None
+
         self.__versionAI: Any = None
 
         self.config()
@@ -111,8 +120,20 @@ class Movie:
         return self._use_lyrics
 
     @property
+    def language(self) -> str:
+        return self._language
+
+    @property
     def lyrics(self) -> Optional[List[str]]:
         return self._lyrics
+
+    @property
+    def translated_lyrics(self) -> Optional[List[str]]:
+        return self._translated_lyrics
+
+    @translated_lyrics.setter
+    def translated_lyrics(self, value: List[str]) -> None:
+        self._translated_lyrics = value
 
     def config(self) -> None:
         """
@@ -136,6 +157,16 @@ class Movie:
                 self._lyrics = file.read().splitlines()
         else:
             self._lyrics = self.get_lyrics()
+
+        if self.language == 'EN':
+            pass
+        elif self.language == 'PT':
+            assert isinstance(self.lyrics, list) and \
+                all(isinstance(item, str) for item in self.lyrics), \
+                "Unexpected return type from config()"
+            self.translated_lyrics = [
+                self.translate(verse) for verse in self.lyrics
+            ]
 
         replicate_key = os.getenv('replicateKey')
         replicate_client = replicate.Client(api_token=replicate_key)
@@ -176,6 +207,7 @@ class Movie:
             frames[0].save(f'{self.path}transition.gif', format='GIF',
                            append_images=frames[1:], save_all=True,
                            duration=self.time_duration / self.n_verses, loop=0)
+            print('>>> The gif background was created.')
         except Exception as err:
             print('>>> An error occurred while generating the gif: '
                   f'\n>>> {err}')
@@ -293,7 +325,9 @@ class Movie:
                 all(isinstance(item, str) for item in self.lyrics), \
                 "Unexpected return type from create_video()"
 
-            text = TextClip(self.lyrics[idx], font="Amiri-bold", fontsize=35,
+            formated_text = break_lines(self.lyrics[idx],
+                                        len(self.lyrics[idx]) // 2)
+            text = TextClip(formated_text, font="Amiri-bold", fontsize=40,
                             color='yellow').set_duration(duration_clip)
 
             text_col = text.on_color(size=(text.w + 10, text.h + 40),
@@ -315,6 +349,28 @@ class Movie:
         video.write_videofile(f'{self.path}output.mp4', fps=24,
                               codec='mpeg4', threads=1)
 
+    def translate(self, message: str) -> Any:
+        try:
+            autenticator = IAMAuthenticator(
+                os.environ['IAMAuthenticatorApiKey'])
+            version = '2023-01-13'  # last update
+            url_api = os.environ['WatsonURLApiKey']
+
+            language_translator = LanguageTranslatorV3(
+                version=f'{version}',
+                authenticator=autenticator)
+            language_translator.set_service_url(url_api)
+
+            translation = language_translator.translate(
+                text=message,
+                model_id='en-pt').get_result()
+            translation = translation["translations"][0]["translation"]
+            return translation
+
+        except ApiException as err:
+            print("Method failed with status code "
+                  + str(err.code) + ": " + err.message)
+
 
 if __name__ == '__main__':
 
@@ -327,4 +383,7 @@ if __name__ == '__main__':
                   time_duration=25,
                   use_background=True,
                   )
-    movie.create_video()
+    # movie.generate_images()
+    # movie.create_video()
+
+    print(movie.translate("It was a good day"))
